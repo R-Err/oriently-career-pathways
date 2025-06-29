@@ -14,9 +14,17 @@ export interface ProfileResult {
 }
 
 export interface QuizSubmission {
+  firstName: string;
+  city: string;
   email: string;
   gdprConsent: boolean;
   answers: QuizAnswer[];
   profile: ProfileResult;
   timestamp: string;
+}
+
+export interface Course {
+  title: string;
+  provider: string;
+  link: string;
 }

@@ -20,6 +20,8 @@ interface QuizSectionProps {
 const QuizSection = ({ onQuizComplete }: QuizSectionProps) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState<QuizAnswer[]>([]);
+  const [firstName, setFirstName] = useState("");
+  const [city, setCity] = useState("");
   const [email, setEmail] = useState("");
   const [gdprConsent, setGdprConsent] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -100,15 +102,15 @@ const QuizSection = ({ onQuizComplete }: QuizSectionProps) => {
     if (currentStep < questions.length - 1) {
       setCurrentStep(currentStep + 1);
     } else {
-      setCurrentStep(currentStep + 1); // Move to contact form
+      setCurrentStep(currentStep + 1); // Move to user info form
     }
   };
 
   const handleSubmit = async () => {
-    if (!email || !gdprConsent) {
+    if (!firstName || !city || !email || !gdprConsent) {
       toast({
         title: "Errore",
-        description: "Inserisci l'email e accetta il consenso GDPR",
+        description: "Compila tutti i campi richiesti e accetta il consenso GDPR",
         variant: "destructive",
       });
       return;
@@ -123,11 +125,15 @@ const QuizSection = ({ onQuizComplete }: QuizSectionProps) => {
       // Track completion
       trackEvent('quiz_complete', {
         profile_type: profile.id,
-        email: email
+        email: email,
+        firstName: firstName,
+        city: city
       });
 
-      // Submit to Google Sheets
+      // Submit to Google Sheets (with additional user data)
       await submitToGoogleSheets({
+        firstName,
+        city,
         email,
         gdprConsent,
         answers,
@@ -136,7 +142,7 @@ const QuizSection = ({ onQuizComplete }: QuizSectionProps) => {
       });
 
       // Send email
-      await sendEmailViaMailerlite(email, profile);
+      await sendEmailViaMailerlite(email, profile, firstName);
 
       // Show results
       onQuizComplete(profile, email);
@@ -158,8 +164,8 @@ const QuizSection = ({ onQuizComplete }: QuizSectionProps) => {
   };
 
   const currentAnswer = answers.find(a => a.questionId === questions[currentStep]?.id);
-  const isContactForm = currentStep >= questions.length;
-  const canProceed = isContactForm ? (email && gdprConsent) : currentAnswer;
+  const isUserInfoForm = currentStep >= questions.length;
+  const canProceed = isUserInfoForm ? (firstName && city && email && gdprConsent) : currentAnswer;
 
   return (
     <section id="quiz" className="py-20 bg-white">
@@ -177,7 +183,7 @@ const QuizSection = ({ onQuizComplete }: QuizSectionProps) => {
           <CardHeader>
             <div className="flex justify-between items-center mb-4">
               <CardTitle className="text-lg">
-                {isContactForm ? "I tuoi dati" : `Domanda ${currentStep + 1} di ${questions.length}`}
+                {isUserInfoForm ? "I tuoi dati" : `Domanda ${currentStep + 1} di ${questions.length}`}
               </CardTitle>
               <div className="text-sm text-gray-500">
                 {Math.round(((currentStep + 1) / (questions.length + 1)) * 100)}%
@@ -192,7 +198,7 @@ const QuizSection = ({ onQuizComplete }: QuizSectionProps) => {
           </CardHeader>
 
           <CardContent className="space-y-6">
-            {!isContactForm ? (
+            {!isUserInfoForm ? (
               <>
                 <h3 className="text-xl font-semibold text-gray-900">
                   {questions[currentStep].question}
@@ -204,12 +210,16 @@ const QuizSection = ({ onQuizComplete }: QuizSectionProps) => {
                   className="space-y-3"
                 >
                   {questions[currentStep].options.map((option) => (
-                    <div key={option.value} className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer">
+                    <Label 
+                      key={option.value} 
+                      htmlFor={option.value} 
+                      className="flex items-center space-x-3 p-4 rounded-lg hover:bg-gray-50 cursor-pointer border border-transparent hover:border-gray-200 transition-all"
+                    >
                       <RadioGroupItem value={option.value} id={option.value} />
-                      <Label htmlFor={option.value} className="cursor-pointer flex-1">
+                      <span className="flex-1 text-gray-800">
                         {option.label}
-                      </Label>
-                    </div>
+                      </span>
+                    </Label>
                   ))}
                 </RadioGroup>
               </>
@@ -220,6 +230,30 @@ const QuizSection = ({ onQuizComplete }: QuizSectionProps) => {
                 </h3>
                 
                 <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="firstName">Come possiamo chiamarti? *</Label>
+                    <Input
+                      id="firstName"
+                      type="text"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      placeholder="Il tuo nome"
+                      className="mt-1"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="city">In quale città vivi? *</Label>
+                    <Input
+                      id="city"
+                      type="text"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      placeholder="La tua città"
+                      className="mt-1"
+                    />
+                  </div>
+
                   <div>
                     <Label htmlFor="email">Email *</Label>
                     <Input
@@ -258,7 +292,7 @@ const QuizSection = ({ onQuizComplete }: QuizSectionProps) => {
               )}
               
               <div className="ml-auto">
-                {!isContactForm ? (
+                {!isUserInfoForm ? (
                   <Button
                     onClick={handleNext}
                     disabled={!canProceed}
