@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,10 +7,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { ProfileResult, QuizAnswer } from "@/types/quiz";
-import { calculateProfile } from "@/utils/profileCalculator";
-import { submitToGoogleSheets } from "@/utils/googleSheets";
-import { sendEmailViaMailerlite } from "@/utils/mailerlite";
+import { availableCourses } from "@/data/courses";
 import { trackEvent } from "@/utils/analytics";
+import { getCityData, searchCities, CityData } from "@/services/cityMapping";
+import { generateAIProfile, submitQuizToDatabase, sendEmailViaAPI } from "@/services/quizService";
 
 interface QuizSectionProps {
   onQuizComplete: (profile: ProfileResult, email: string) => void;
@@ -22,6 +21,8 @@ const QuizSection = ({ onQuizComplete }: QuizSectionProps) => {
   const [answers, setAnswers] = useState<QuizAnswer[]>([]);
   const [firstName, setFirstName] = useState("");
   const [city, setCity] = useState("");
+  const [cityData, setCityData] = useState<CityData | null>(null);
+  const [citySuggestions, setCitySuggestions] = useState<CityData[]>([]);
   const [email, setEmail] = useState("");
   const [gdprConsent, setGdprConsent] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -98,11 +99,28 @@ const QuizSection = ({ onQuizComplete }: QuizSectionProps) => {
     }
   };
 
+  const handleCityChange = async (value: string) => {
+    setCity(value);
+    
+    if (value.length > 2) {
+      const suggestions = await searchCities(value);
+      setCitySuggestions(suggestions);
+    } else {
+      setCitySuggestions([]);
+    }
+  };
+
+  const handleCitySelect = async (selectedCity: CityData) => {
+    setCity(selectedCity.city);
+    setCityData(selectedCity);
+    setCitySuggestions([]);
+  };
+
   const handleNext = () => {
     if (currentStep < questions.length - 1) {
       setCurrentStep(currentStep + 1);
     } else {
-      setCurrentStep(currentStep + 1); // Move to user info form
+      setCurrentStep(currentStep + 1);
     }
   };
 
@@ -119,9 +137,32 @@ const QuizSection = ({ onQuizComplete }: QuizSectionProps) => {
     setIsSubmitting(true);
     
     try {
-      // Calculate profile
-      const profile = calculateProfile(answers, questions);
+      // Get city data if not already available
+      let finalCityData = cityData;
+      if (!finalCityData) {
+        finalCityData = await getCityData(city);
+      }
+
+      // Generate AI profile
+      const aiResult = await generateAIProfile(answers, questions);
       
+      // Find actual course objects from the AI suggestions
+      const suggestedCourseObjects = aiResult.suggestedCourses.map(courseName => {
+        return availableCourses.find(course => 
+          course.title.toLowerCase().includes(courseName.toLowerCase()) ||
+          courseName.toLowerCase().includes(course.title.toLowerCase())
+        );
+      }).filter(Boolean);
+
+      // Create profile result
+      const profile: ProfileResult = {
+        id: "ai_generated",
+        title: "Il tuo Profilo Personalizzato",
+        description: aiResult.profile,
+        courses: aiResult.suggestedCourses,
+        color: "from-blue-500 to-purple-600"
+      };
+
       // Track completion
       trackEvent('quiz_complete', {
         profile_type: profile.id,
@@ -130,19 +171,23 @@ const QuizSection = ({ onQuizComplete }: QuizSectionProps) => {
         city: city
       });
 
-      // Submit to Google Sheets (with additional user data)
-      await submitToGoogleSheets({
+      // Submit to database
+      await submitQuizToDatabase({
         firstName,
         city,
+        province: finalCityData?.province || "",
+        region: finalCityData?.region || "",
+        country: finalCityData?.country || "Italy",
         email,
         gdprConsent,
         answers,
         profile,
+        suggestedCourses: suggestedCourseObjects,
         timestamp: new Date().toISOString()
       });
 
       // Send email
-      await sendEmailViaMailerlite(email, profile, firstName);
+      await sendEmailViaAPI(email, firstName, profile);
 
       // Show results
       onQuizComplete(profile, email);
@@ -242,16 +287,35 @@ const QuizSection = ({ onQuizComplete }: QuizSectionProps) => {
                     />
                   </div>
 
-                  <div>
+                  <div className="relative">
                     <Label htmlFor="city">In quale città vivi? *</Label>
                     <Input
                       id="city"
                       type="text"
                       value={city}
-                      onChange={(e) => setCity(e.target.value)}
+                      onChange={(e) => handleCityChange(e.target.value)}
                       placeholder="La tua città"
                       className="mt-1"
                     />
+                    {citySuggestions.length > 0 && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-40 overflow-y-auto">
+                        {citySuggestions.map((suggestion, index) => (
+                          <button
+                            key={index}
+                            type="button"
+                            className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm"
+                            onClick={() => handleCitySelect(suggestion)}
+                          >
+                            {suggestion.city}, {suggestion.province} ({suggestion.region})
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {cityData && (
+                      <p className="text-sm text-gray-500 mt-1">
+                        {cityData.city}, {cityData.province} - {cityData.region}
+                      </p>
+                    )}
                   </div>
 
                   <div>

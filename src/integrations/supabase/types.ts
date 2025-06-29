@@ -9,7 +9,78 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      italian_cities: {
+        Row: {
+          city: string
+          country: string | null
+          id: number
+          province: string
+          region: string
+        }
+        Insert: {
+          city: string
+          country?: string | null
+          id?: number
+          province: string
+          region: string
+        }
+        Update: {
+          city?: string
+          country?: string | null
+          id?: number
+          province?: string
+          region?: string
+        }
+        Relationships: []
+      }
+      quiz_submissions: {
+        Row: {
+          answers: Json
+          city: string
+          country: string | null
+          created_at: string
+          email: string
+          first_name: string
+          gdpr_consent: boolean
+          id: string
+          profile_result: Json
+          province: string | null
+          region: string | null
+          suggested_courses: Json
+          updated_at: string
+        }
+        Insert: {
+          answers: Json
+          city: string
+          country?: string | null
+          created_at?: string
+          email: string
+          first_name: string
+          gdpr_consent?: boolean
+          id?: string
+          profile_result: Json
+          province?: string | null
+          region?: string | null
+          suggested_courses: Json
+          updated_at?: string
+        }
+        Update: {
+          answers?: Json
+          city?: string
+          country?: string | null
+          created_at?: string
+          email?: string
+          first_name?: string
+          gdpr_consent?: boolean
+          id?: string
+          profile_result?: Json
+          province?: string | null
+          region?: string | null
+          suggested_courses?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
