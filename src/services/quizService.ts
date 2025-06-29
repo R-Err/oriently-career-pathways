@@ -28,18 +28,18 @@ export const submitQuizToDatabase = async (submission: QuizSubmission): Promise<
   try {
     const { error } = await supabase
       .from('quiz_submissions')
-      .insert({
+      .insert([{
         first_name: submission.firstName,
         email: submission.email,
         city: submission.city,
-        province: submission.province,
-        region: submission.region,
-        country: submission.country,
+        province: submission.province || null,
+        region: submission.region || null,
+        country: submission.country || 'Italy',
         gdpr_consent: submission.gdprConsent,
         answers: submission.answers,
         profile_result: submission.profile,
-        suggested_courses: submission.suggestedCourses,
-      });
+        suggested_courses: submission.suggestedCourses || [],
+      }]);
 
     if (error) {
       console.error('Error submitting to database:', error);
