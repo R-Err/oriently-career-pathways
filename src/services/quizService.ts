@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { QuizSubmission, ProfileResult } from "@/types/quiz";
 
@@ -28,7 +27,7 @@ export const submitQuizToDatabase = async (submission: QuizSubmission): Promise<
   try {
     const { error } = await supabase
       .from('quiz_submissions')
-      .insert([{
+      .insert({
         first_name: submission.firstName,
         email: submission.email,
         city: submission.city,
@@ -36,10 +35,10 @@ export const submitQuizToDatabase = async (submission: QuizSubmission): Promise<
         region: submission.region || null,
         country: submission.country || 'Italy',
         gdpr_consent: submission.gdprConsent,
-        answers: submission.answers,
-        profile_result: submission.profile,
+        answers: submission.answers as any,
+        profile_result: submission.profile as any,
         suggested_courses: submission.suggestedCourses || [],
-      }]);
+      });
 
     if (error) {
       console.error('Error submitting to database:', error);
