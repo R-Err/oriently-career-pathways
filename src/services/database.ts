@@ -97,7 +97,7 @@ export const submitQuizToDatabase = async (submission: QuizSubmission): Promise<
   }
 };
 
-export const getCityData = async (cityName: string) => {
+export const getCityData = async (cityName: string): Promise<{ city: string; province: string; region: string; country: string } | null> => {
   try {
     const stmt = db.prepare(`
       SELECT city, province, region, country 
@@ -106,7 +106,7 @@ export const getCityData = async (cityName: string) => {
       LIMIT 1
     `);
     
-    const result = stmt.get(`%${cityName}%`);
+    const result = stmt.get(`%${cityName}%`) as { city: string; province: string; region: string; country: string } | undefined;
     return result || null;
   } catch (error) {
     console.error('Error fetching city data:', error);
@@ -114,7 +114,7 @@ export const getCityData = async (cityName: string) => {
   }
 };
 
-export const searchCities = async (query: string) => {
+export const searchCities = async (query: string): Promise<{ city: string; province: string; region: string; country: string }[]> => {
   try {
     const stmt = db.prepare(`
       SELECT city, province, region, country 
@@ -123,7 +123,7 @@ export const searchCities = async (query: string) => {
       LIMIT 10
     `);
     
-    const results = stmt.all(`%${query}%`);
+    const results = stmt.all(`%${query}%`) as { city: string; province: string; region: string; country: string }[];
     return results;
   } catch (error) {
     console.error('Error searching cities:', error);

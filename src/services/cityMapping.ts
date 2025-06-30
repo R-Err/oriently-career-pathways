@@ -9,9 +9,13 @@ export interface CityData {
 }
 
 export const getCityData = async (cityName: string): Promise<CityData | null> => {
-  return getSQLiteCityData(cityName);
+  const result = await getSQLiteCityData(cityName);
+  if (!result) return null;
+  
+  return result as CityData;
 };
 
 export const searchCities = async (query: string): Promise<CityData[]> => {
-  return searchSQLiteCities(query);
+  const results = await searchSQLiteCities(query);
+  return results as CityData[];
 };
