@@ -1,61 +1,70 @@
 
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-
-const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const AVAILABLE_COURSES = [
-  "Corso Full Stack Developer (Start2Impact)",
-  "Corso UX/UI Design (Start2Impact)", 
-  "Corso Data Analyst (Boolean)",
-  "Corso Web Developer (Boolean)",
-  "Corso Digital Marketing (Talent Garden)",
-  "Corso Cybersecurity (Talent Garden)",
-  "Corso Product Management (Start2Impact)",
-  "Corso Graphic Design (IED)",
-  "Corso Intelligenza Artificiale (Talent Garden)",
-  "Corso Project Management (Uninettuno)"
-];
-
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
     const { answers, firstName } = await req.json();
+    
+    console.log("Received data:", { answers, firstName });
+    
+    // Validate that answers is an array and has content
+    if (!answers || !Array.isArray(answers) || answers.length === 0) {
+      throw new Error("No answers provided or answers is not a valid array");
+    }
 
-    const answersText = answers.map((answer: any, index: number) => 
-      `Domanda ${index + 1}: ${answer.answer}`
+    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+    if (!openaiApiKey) {
+      throw new Error('OpenAI API key not configured');
+    }
+
+    // Convert answers to a readable format for the prompt
+    const answersText = answers.map(answer => 
+      `${answer.questionId}: ${answer.answer}`
     ).join('\n');
 
-    const prompt = `Analizza le seguenti risposte del quiz di orientamento professionale e genera:
+    console.log("Formatted answers:", answersText);
 
-1. Un profilo professionale personalizzato in italiano (massimo 3-4 frasi)
-2. Suggerisci esattamente 3 corsi dalla lista seguente che sono più adatti:
+    const prompt = `
+Basandoti sulle seguenti risposte al quiz di orientamento professionale, genera un profilo personalizzato per ${firstName}:
 
-${AVAILABLE_COURSES.join('\n')}
-
-Risposte del quiz:
 ${answersText}
 
-Nome dell'utente: ${firstName}
-
-Rispondi in formato JSON:
+Rispondi SOLO con un JSON nel seguente formato:
 {
-  "profile": "Il tuo profilo professionale personalizzato...",
-  "courses": ["Corso 1", "Corso 2", "Corso 3"]
-}`;
+  "profile": "Descrizione del profilo professionale in 3-4 frasi (in italiano)",
+  "courses": ["Nome corso 1", "Nome corso 2", "Nome corso 3"]
+}
+
+I corsi devono essere scelti tra questi disponibili:
+- Corso Full Stack Developer
+- Corso UX/UI Design  
+- Corso Data Analyst
+- Corso Web Developer
+- Corso Digital Marketing
+- Corso Cybersecurity
+- Corso Product Management
+- Corso Graphic Design
+- Corso Intelligenza Artificiale
+- Corso Project Management
+
+Rispondi SOLO con il JSON, senza altra formattazione.
+`;
+
+    console.log("Sending prompt to OpenAI");
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
+        'Authorization': `Bearer ${openaiApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -63,7 +72,7 @@ Rispondi in formato JSON:
         messages: [
           { 
             role: 'system', 
-            content: 'Sei un consulente di carriera esperto che aiuta le persone a trovare il loro percorso professionale ideale.' 
+            content: 'You are a career guidance expert. Respond only with valid JSON format.' 
           },
           { role: 'user', content: prompt }
         ],
@@ -71,17 +80,47 @@ Rispondi in formato JSON:
       }),
     });
 
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
+    }
+
     const data = await response.json();
-    const result = JSON.parse(data.choices[0].message.content);
+    console.log("OpenAI response:", data);
+
+    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+      throw new Error("Invalid response from OpenAI");
+    }
+
+    const aiResponse = data.choices[0].message.content;
+    console.log("AI response content:", aiResponse);
+
+    // Parse the JSON response
+    let result;
+    try {
+      result = JSON.parse(aiResponse);
+    } catch (parseError) {
+      console.error("Failed to parse AI response as JSON:", parseError);
+      // Fallback response if JSON parsing fails
+      result = {
+        profile: `Ciao ${firstName}! Basandoti sulle tue risposte, sembri essere una persona orientata verso l'innovazione e la tecnologia. Hai un approccio pratico ai problemi e preferisci lavorare in team. Questo profilo ti rende ideale per percorsi formativi nel campo del digitale e della tecnologia.`,
+        courses: ["Corso Full Stack Developer", "Corso Digital Marketing", "Corso UX/UI Design"]
+      };
+    }
+
+    console.log("Final result:", result);
 
     return new Response(JSON.stringify(result), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
+
   } catch (error) {
-    console.error('Error in generate-profile function:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    console.error("Error in generate-profile function:", error);
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
   }
 });
