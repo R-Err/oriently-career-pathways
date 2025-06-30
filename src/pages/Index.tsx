@@ -7,16 +7,19 @@ import ResultsSection from "@/components/ResultsSection";
 import Footer from "@/components/Footer";
 import CookieBanner from "@/components/CookieBanner";
 import { ProfileResult } from "@/types/quiz";
+import { UserProfile } from "@/types/course";
 
 const Index = () => {
   const [showResults, setShowResults] = useState(false);
   const [userProfile, setUserProfile] = useState<ProfileResult | null>(null);
   const [userEmail, setUserEmail] = useState("");
+  const [userInfo, setUserInfo] = useState<UserProfile | null>(null);
 
-  const handleQuizComplete = (profile: ProfileResult, email: string) => {
-    console.log("Quiz completed:", { profile, email });
+  const handleQuizComplete = (profile: ProfileResult, email: string, userData: UserProfile) => {
+    console.log("Quiz completed:", { profile, email, userData });
     setUserProfile(profile);
     setUserEmail(email);
+    setUserInfo(userData);
     setShowResults(true);
     
     // Scroll to results section
@@ -33,8 +36,12 @@ const Index = () => {
       <Header />
       <HowItWorks />
       <QuizSection onQuizComplete={handleQuizComplete} />
-      {showResults && userProfile && (
-        <ResultsSection profile={userProfile} email={userEmail} />
+      {showResults && userProfile && userInfo && (
+        <ResultsSection 
+          profile={userProfile} 
+          email={userEmail}
+          userInfo={userInfo}
+        />
       )}
       <Footer />
       <CookieBanner />

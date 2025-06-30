@@ -2,21 +2,27 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ProfileResult } from "@/types/quiz";
+import { UserProfile } from "@/types/course";
 import { useToast } from "@/hooks/use-toast";
-import { sendEmailViaMailerlite } from "@/utils/mailerlite";
 import { trackEvent } from "@/utils/analytics";
 
 interface ResultsSectionProps {
   profile: ProfileResult;
   email: string;
+  userInfo: UserProfile;
 }
 
-const ResultsSection = ({ profile, email }: ResultsSectionProps) => {
+const ResultsSection = ({ profile, email, userInfo }: ResultsSectionProps) => {
   const { toast } = useToast();
 
   const handleSendEmail = async () => {
     try {
-      await sendEmailViaMailerlite(email, profile);
+      await fetch('/functions/v1/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, profile, userInfo }),
+      });
+      
       trackEvent('email_resend', { profile_type: profile.id });
       
       toast({
@@ -38,10 +44,10 @@ const ResultsSection = ({ profile, email }: ResultsSectionProps) => {
       <div className="container mx-auto px-4 max-w-3xl">
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-            Il tuo profilo personalizzato
+            Ciao {userInfo.first_name}! Ecco il tuo profilo personalizzato
           </h2>
           <p className="text-xl text-gray-600">
-            Ecco i risultati del tuo quiz di orientamento
+            Basato sulle tue risposte e generato con intelligenza artificiale
           </p>
         </div>
 
@@ -53,6 +59,9 @@ const ResultsSection = ({ profile, email }: ResultsSectionProps) => {
             <CardTitle className="text-2xl md:text-3xl font-bold text-white mb-2">
               {profile.title}
             </CardTitle>
+            <p className="text-white text-opacity-90">
+              {userInfo.city}, {userInfo.province} - {userInfo.region}
+            </p>
           </CardHeader>
 
           <CardContent className="space-y-6">
