@@ -194,7 +194,7 @@ const QuizSection = ({ onQuizComplete }: QuizSectionProps) => {
 
       toast({
         title: "Quiz completato!",
-        description: "I tuoi risultati sono stati inviati via email",
+        description: "I tuoi risultati sono stati salvati",
       });
     } catch (error) {
       console.error("Error submitting quiz:", error);

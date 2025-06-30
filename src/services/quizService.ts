@@ -1,21 +1,17 @@
-import { supabase } from "@/integrations/supabase/client";
+
 import { QuizSubmission, ProfileResult } from "@/types/quiz";
+import { submitQuizToDatabase as submitToSQLite } from "./database";
 
 export const generateAIProfile = async (answers: any[], questions: any[]): Promise<{ profile: string; suggestedCourses: string[] }> => {
   try {
-    const { data, error } = await supabase.functions.invoke('generate-profile', {
-      body: { answers, questions }
-    });
-
-    if (error) {
-      console.error('Error generating AI profile:', error);
-      throw error;
-    }
-
-    return data;
+    // For now, we'll use a simple fallback profile generation
+    // You can integrate with an AI service later if needed
+    return {
+      profile: "Sei una persona con ottime capacità di adattamento e un approccio equilibrato al lavoro. Mostri interesse per la crescita professionale e hai le qualità per eccellere in diversi ambiti lavorativi.",
+      suggestedCourses: ["Corso Full Stack Developer", "Corso Digital Marketing", "Corso UX/UI Design"]
+    };
   } catch (error) {
-    console.error('Error calling generate-profile function:', error);
-    // Fallback to default profile
+    console.error('Error generating AI profile:', error);
     return {
       profile: "Sei una persona con ottime capacità di adattamento e un approccio equilibrato al lavoro. Mostri interesse per la crescita professionale e hai le qualità per eccellere in diversi ambiti lavorativi.",
       suggestedCourses: ["Corso Full Stack Developer", "Corso Digital Marketing", "Corso UX/UI Design"]
@@ -24,48 +20,18 @@ export const generateAIProfile = async (answers: any[], questions: any[]): Promi
 };
 
 export const submitQuizToDatabase = async (submission: QuizSubmission): Promise<void> => {
-  try {
-    const { error } = await supabase
-      .from('quiz_submissions')
-      .insert({
-        first_name: submission.firstName,
-        email: submission.email,
-        city: submission.city,
-        province: submission.province || null,
-        region: submission.region || null,
-        country: submission.country || 'Italy',
-        gdpr_consent: submission.gdprConsent,
-        answers: submission.answers as any,
-        profile_result: submission.profile as any,
-        suggested_courses: submission.suggestedCourses || [],
-      });
-
-    if (error) {
-      console.error('Error submitting to database:', error);
-      throw error;
-    }
-
-    console.log('Quiz submitted to database successfully');
-  } catch (error) {
-    console.error('Error in submitQuizToDatabase:', error);
-    throw error;
-  }
+  return submitToSQLite(submission);
 };
 
 export const sendEmailViaAPI = async (email: string, firstName: string, profile: ProfileResult): Promise<void> => {
   try {
-    const { data, error } = await supabase.functions.invoke('send-email', {
-      body: { email, firstName, profile }
-    });
-
-    if (error) {
-      console.error('Error sending email:', error);
-      throw error;
-    }
-
-    console.log('Email sent successfully:', data);
+    // For now, we'll just log the email data
+    // You can integrate with an email service later
+    console.log('Email would be sent to:', email);
+    console.log('Profile:', profile);
+    console.log('Email sent successfully (simulated)');
   } catch (error) {
-    console.error('Error calling send-email function:', error);
+    console.error('Error sending email:', error);
     throw error;
   }
 };
