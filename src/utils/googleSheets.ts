@@ -1,8 +1,16 @@
 
 import { QuizSubmission } from "@/types/quiz";
 
-// This utility is now deprecated - data is stored in Supabase database
 export const submitToGoogleSheets = async (submission: QuizSubmission): Promise<void> => {
-  console.log("Google Sheets integration is deprecated. Data is now stored in Supabase database.");
-  return Promise.resolve();
+  // This would normally connect to Google Sheets API
+  // For demo purposes, we'll just log the data
+  console.log("Submitting to Google Sheets:", submission);
+  
+  // Simulate API call
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      console.log("Data submitted to Google Sheets successfully");
+      resolve();
+    }, 1000);
+  });
 };
