@@ -118,10 +118,13 @@ const QuizSection = ({ onQuizComplete }: QuizSectionProps) => {
     setIsSubmitting(true);
     
     try {
-      // Generate AI profile
-      const profileResponse = await fetch('/functions/v1/generate-profile', {
+      // Generate AI profile using the correct Supabase URL
+      const profileResponse = await fetch('https://evynyovnjoauudinlmid.supabase.co/functions/v1/generate-profile', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV2eW55b3Zuam9hdXVkaW5sbWlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTExOTE0ODIsImV4cCI6MjA2Njc2NzQ4Mn0.61sV7-oOqD60lOy_fwoH7uhKlF3QMll_y_vVKAPcIt8'}`
+        },
         body: JSON.stringify({ 
           answers, 
           firstName: userInfo.first_name 
@@ -148,9 +151,12 @@ const QuizSection = ({ onQuizComplete }: QuizSectionProps) => {
       };
 
       // Submit to database
-      const submissionResponse = await fetch('/functions/v1/quiz-submit', {
+      const submissionResponse = await fetch('https://evynyovnjoauudinlmid.supabase.co/functions/v1/quiz-submit', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV2eW55b3Zuam9hdXVkaW5sbWlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTExOTE0ODIsImV4cCI6MjA2Njc2NzQ4Mn0.61sV7-oOqD60lOy_fwoH7uhKlF3QMll_y_vVKAPcIt8`
+        },
         body: JSON.stringify({
           first_name: userInfo.first_name,
           email,
@@ -176,9 +182,12 @@ const QuizSection = ({ onQuizComplete }: QuizSectionProps) => {
 
       // Send email via MailerLite
       try {
-        await fetch('/functions/v1/send-email', {
+        await fetch('https://evynyovnjoauudinlmid.supabase.co/functions/v1/send-email', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV2eW55b3Zuam9hdXVkaW5sbWlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTExOTE0ODIsImV4cCI6MjA2Njc2NzQ4Mn0.61sV7-oOqD60lOy_fwoH7uhKlF3QMll_y_vVKAPcIt8`
+          },
           body: JSON.stringify({ email, profile, userInfo }),
         });
       } catch (emailError) {

@@ -17,9 +17,12 @@ const ResultsSection = ({ profile, email, userInfo }: ResultsSectionProps) => {
 
   const handleSendEmail = async () => {
     try {
-      await fetch('/functions/v1/send-email', {
+      await fetch('https://evynyovnjoauudinlmid.supabase.co/functions/v1/send-email', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV2eW55b3Zuam9hdXVkaW5sbWlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTExOTE0ODIsImV4cCI6MjA2Njc2NzQ4Mn0.61sV7-oOqD60lOy_fwoH7uhKlF3QMll_y_vVKAPcIt8`
+        },
         body: JSON.stringify({ email, profile, userInfo }),
       });
       
