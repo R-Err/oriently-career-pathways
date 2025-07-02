@@ -13,10 +13,19 @@ export interface ProfileResult {
   color: string;
 }
 
-export interface QuizSubmission {
+export interface UserProfile {
+  firstName: string;
   email: string;
+  city: string;
+  province?: string;
+  region?: string;
+  country?: string;
+}
+
+export interface QuizSubmission {
+  userProfile: UserProfile;
   gdprConsent: boolean;
   answers: QuizAnswer[];
-  profile: ProfileResult;
+  profileResult: ProfileResult;
   timestamp: string;
 }

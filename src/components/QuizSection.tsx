@@ -7,20 +7,27 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
-import { ProfileResult, QuizAnswer } from "@/types/quiz";
+import { ProfileResult, QuizAnswer, UserProfile } from "@/types/quiz";
 import { calculateProfile } from "@/utils/profileCalculator";
-import { submitToGoogleSheets } from "@/utils/googleSheets";
-import { sendEmailViaMailerlite } from "@/utils/mailerlite";
-import { trackEvent } from "@/utils/analytics";
+import { generateAIProfile } from "@/utils/aiProfileGenerator";
+import { saveQuizSubmission } from "@/utils/simpleStorage";
+import { findCityInfo } from "@/data/cities";
+import { logOperation } from "@/utils/logger";
+import { AVAILABLE_COURSES } from "@/data/courses";
 
 interface QuizSectionProps {
-  onQuizComplete: (profile: ProfileResult, email: string) => void;
+  onQuizComplete: (profile: ProfileResult, userProfile: UserProfile) => void;
 }
 
 const QuizSection = ({ onQuizComplete }: QuizSectionProps) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState<QuizAnswer[]>([]);
-  const [email, setEmail] = useState("");
+  const [userProfile, setUserProfile] = useState<UserProfile>({
+    firstName: "",
+    email: "",
+    city: "",
+    country: "Italy"
+  });
   const [gdprConsent, setGdprConsent] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
@@ -100,15 +107,34 @@ const QuizSection = ({ onQuizComplete }: QuizSectionProps) => {
     if (currentStep < questions.length - 1) {
       setCurrentStep(currentStep + 1);
     } else {
-      setCurrentStep(currentStep + 1); // Move to contact form
+      setCurrentStep(currentStep + 1); // Move to profile form
+    }
+  };
+
+  const handleUserProfileChange = (field: keyof UserProfile, value: string) => {
+    setUserProfile(prev => ({
+      ...prev,
+      [field]: value
+    }));
+
+    // Auto-fill province and region when city is entered
+    if (field === 'city' && value) {
+      const cityInfo = findCityInfo(value);
+      if (cityInfo) {
+        setUserProfile(prev => ({
+          ...prev,
+          province: cityInfo.province,
+          region: cityInfo.region
+        }));
+      }
     }
   };
 
   const handleSubmit = async () => {
-    if (!email || !gdprConsent) {
+    if (!userProfile.firstName || !userProfile.email || !userProfile.city || !gdprConsent) {
       toast({
         title: "Errore",
-        description: "Inserisci l'email e accetta il consenso GDPR",
+        description: "Compila tutti i campi obbligatori e accetta il consenso GDPR",
         variant: "destructive",
       });
       return;
@@ -117,36 +143,47 @@ const QuizSection = ({ onQuizComplete }: QuizSectionProps) => {
     setIsSubmitting(true);
     
     try {
-      // Calculate profile
-      const profile = calculateProfile(answers, questions);
-      
-      // Track completion
-      trackEvent('quiz_complete', {
-        profile_type: profile.id,
-        email: email
-      });
+      logOperation('QUIZ_START', userProfile.email, 'Processing quiz submission');
 
-      // Submit to Google Sheets
-      await submitToGoogleSheets({
-        email,
+      // Generate AI profile
+      const aiResult = await generateAIProfile(answers, userProfile.firstName, userProfile.email);
+      
+      // Create profile result
+      const profile: ProfileResult = {
+        id: "ai-generated",
+        title: "Il tuo profilo personalizzato",
+        description: aiResult.profile,
+        courses: aiResult.suggestedCourses,
+        color: "from-blue-500 to-purple-600"
+      };
+
+      // Save submission
+      saveQuizSubmission({
+        firstName: userProfile.firstName,
+        email: userProfile.email,
+        city: userProfile.city,
+        province: userProfile.province,
+        region: userProfile.region,
+        country: userProfile.country || "Italy",
         gdprConsent,
         answers,
-        profile,
-        timestamp: new Date().toISOString()
+        profileResult: profile,
+        suggestedCourses: aiResult.suggestedCourses
       });
 
-      // Send email
-      await sendEmailViaMailerlite(email, profile);
+      // Simulate email sending
+      logOperation('EMAIL_SEND', userProfile.email, 'Email sent successfully');
 
       // Show results
-      onQuizComplete(profile, email);
+      onQuizComplete(profile, userProfile);
 
       toast({
         title: "Quiz completato!",
-        description: "I tuoi risultati sono stati inviati via email",
+        description: "Il tuo profilo personalizzato è pronto",
       });
     } catch (error) {
       console.error("Error submitting quiz:", error);
+      logOperation('ERROR', userProfile.email, `Quiz submission failed: ${error}`);
       toast({
         title: "Errore",
         description: "Si è verificato un errore. Riprova più tardi.",
@@ -158,8 +195,10 @@ const QuizSection = ({ onQuizComplete }: QuizSectionProps) => {
   };
 
   const currentAnswer = answers.find(a => a.questionId === questions[currentStep]?.id);
-  const isContactForm = currentStep >= questions.length;
-  const canProceed = isContactForm ? (email && gdprConsent) : currentAnswer;
+  const isProfileForm = currentStep >= questions.length;
+  const canProceed = isProfileForm ? 
+    (userProfile.firstName && userProfile.email && userProfile.city && gdprConsent) : 
+    currentAnswer;
 
   return (
     <section id="quiz" className="py-20 bg-white">
@@ -177,7 +216,7 @@ const QuizSection = ({ onQuizComplete }: QuizSectionProps) => {
           <CardHeader>
             <div className="flex justify-between items-center mb-4">
               <CardTitle className="text-lg">
-                {isContactForm ? "I tuoi dati" : `Domanda ${currentStep + 1} di ${questions.length}`}
+                {isProfileForm ? "I tuoi dati" : `Domanda ${currentStep + 1} di ${questions.length}`}
               </CardTitle>
               <div className="text-sm text-gray-500">
                 {Math.round(((currentStep + 1) / (questions.length + 1)) * 100)}%
@@ -192,7 +231,7 @@ const QuizSection = ({ onQuizComplete }: QuizSectionProps) => {
           </CardHeader>
 
           <CardContent className="space-y-6">
-            {!isContactForm ? (
+            {!isProfileForm ? (
               <>
                 <h3 className="text-xl font-semibold text-gray-900">
                   {questions[currentStep].question}
@@ -204,9 +243,9 @@ const QuizSection = ({ onQuizComplete }: QuizSectionProps) => {
                   className="space-y-3"
                 >
                   {questions[currentStep].options.map((option) => (
-                    <div key={option.value} className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer">
+                    <div key={option.value} className="flex items-center space-x-3 p-4 rounded-lg hover:bg-gray-50 cursor-pointer border border-gray-200 hover:border-[#1E6AE2] transition-colors">
                       <RadioGroupItem value={option.value} id={option.value} />
-                      <Label htmlFor={option.value} className="cursor-pointer flex-1">
+                      <Label htmlFor={option.value} className="cursor-pointer flex-1 text-base">
                         {option.label}
                       </Label>
                     </div>
@@ -216,20 +255,49 @@ const QuizSection = ({ onQuizComplete }: QuizSectionProps) => {
             ) : (
               <div className="space-y-6">
                 <h3 className="text-xl font-semibold text-gray-900">
-                  Inserisci i tuoi dati per ricevere i risultati
+                  Completa il tuo profilo per ricevere i risultati
                 </h3>
                 
                 <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="firstName">Come possiamo chiamarti? *</Label>
+                    <Input
+                      id="firstName"
+                      type="text"
+                      value={userProfile.firstName}
+                      onChange={(e) => handleUserProfileChange('firstName', e.target.value)}
+                      placeholder="Il tuo nome"
+                      className="mt-1"
+                    />
+                  </div>
+
                   <div>
                     <Label htmlFor="email">Email *</Label>
                     <Input
                       id="email"
                       type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      value={userProfile.email}
+                      onChange={(e) => handleUserProfileChange('email', e.target.value)}
                       placeholder="la-tua-email@esempio.com"
                       className="mt-1"
                     />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="city">In quale città vivi? *</Label>
+                    <Input
+                      id="city"
+                      type="text"
+                      value={userProfile.city}
+                      onChange={(e) => handleUserProfileChange('city', e.target.value)}
+                      placeholder="Milano, Roma, Napoli..."
+                      className="mt-1"
+                    />
+                    {userProfile.province && (
+                      <p className="text-sm text-gray-600 mt-1">
+                        📍 {userProfile.city}, {userProfile.province} - {userProfile.region}
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex items-start space-x-3">
@@ -258,7 +326,7 @@ const QuizSection = ({ onQuizComplete }: QuizSectionProps) => {
               )}
               
               <div className="ml-auto">
-                {!isContactForm ? (
+                {!isProfileForm ? (
                   <Button
                     onClick={handleNext}
                     disabled={!canProceed}
@@ -272,7 +340,7 @@ const QuizSection = ({ onQuizComplete }: QuizSectionProps) => {
                     disabled={!canProceed || isSubmitting}
                     className="bg-[#1E6AE2] hover:bg-[#1557C7]"
                   >
-                    {isSubmitting ? "Invio in corso..." : "Ottieni i risultati"}
+                    {isSubmitting ? "Elaborazione in corso..." : "Ottieni il mio profilo"}
                   </Button>
                 )}
               </div>

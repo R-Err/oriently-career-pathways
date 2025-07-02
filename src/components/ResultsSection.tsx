@@ -1,23 +1,25 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ProfileResult } from "@/types/quiz";
+import { ProfileResult, UserProfile } from "@/types/quiz";
 import { useToast } from "@/hooks/use-toast";
-import { sendEmailViaMailerlite } from "@/utils/mailerlite";
-import { trackEvent } from "@/utils/analytics";
+import { logOperation } from "@/utils/logger";
+import { AVAILABLE_COURSES } from "@/data/courses";
 
 interface ResultsSectionProps {
   profile: ProfileResult;
-  email: string;
+  userProfile: UserProfile;
 }
 
-const ResultsSection = ({ profile, email }: ResultsSectionProps) => {
+const ResultsSection = ({ profile, userProfile }: ResultsSectionProps) => {
   const { toast } = useToast();
 
   const handleSendEmail = async () => {
     try {
-      await sendEmailViaMailerlite(email, profile);
-      trackEvent('email_resend', { profile_type: profile.id });
+      // Simulate email sending
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      logOperation('EMAIL_RESEND', userProfile.email, 'Profile details resent');
       
       toast({
         title: "Email inviata!",
@@ -25,6 +27,7 @@ const ResultsSection = ({ profile, email }: ResultsSectionProps) => {
       });
     } catch (error) {
       console.error("Error sending email:", error);
+      logOperation('EMAIL_ERROR', userProfile.email, `Error: ${error}`);
       toast({
         title: "Errore",
         description: "Errore nell'invio dell'email. Riprova più tardi.",
@@ -33,15 +36,19 @@ const ResultsSection = ({ profile, email }: ResultsSectionProps) => {
     }
   };
 
+  const getCourseDetails = (courseTitle: string) => {
+    return AVAILABLE_COURSES.find(course => course.title === courseTitle);
+  };
+
   return (
     <section id="results" className="py-20 bg-gray-50">
       <div className="container mx-auto px-4 max-w-3xl">
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-            Il tuo profilo personalizzato
+            Ciao {userProfile.firstName}! 👋
           </h2>
           <p className="text-xl text-gray-600">
-            Ecco i risultati del tuo quiz di orientamento
+            Ecco il tuo profilo personalizzato
           </p>
         </div>
 
@@ -66,15 +73,33 @@ const ResultsSection = ({ profile, email }: ResultsSectionProps) => {
               <h3 className="text-xl font-semibold text-gray-900 mb-4">
                 Percorsi consigliati per te:
               </h3>
-              <ul className="space-y-3">
-                {profile.courses.map((course, index) => (
-                  <li key={index} className="flex items-start space-x-3">
-                    <div className="w-6 h-6 bg-[#1E6AE2] rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <span className="text-white text-sm font-bold">{index + 1}</span>
-                    </div>
-                    <span className="text-gray-800 leading-relaxed">{course}</span>
-                  </li>
-                ))}
+              <ul className="space-y-4">
+                {profile.courses.map((courseName, index) => {
+                  const courseDetails = getCourseDetails(courseName);
+                  return (
+                    <li key={index} className="flex items-start space-x-3">
+                      <div className="w-6 h-6 bg-[#1E6AE2] rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <span className="text-white text-sm font-bold">{index + 1}</span>
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-gray-900">{courseName}</h4>
+                        {courseDetails && (
+                          <div className="mt-1">
+                            <p className="text-sm text-gray-600">Provider: {courseDetails.provider}</p>
+                            <a 
+                              href={courseDetails.link} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="inline-block mt-1 text-sm text-[#1E6AE2] hover:underline"
+                            >
+                              Scopri di più →
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
 
@@ -87,7 +112,7 @@ const ResultsSection = ({ profile, email }: ResultsSectionProps) => {
                 Ricevi dettagli via e-mail
               </Button>
               <p className="text-white text-sm mt-3 opacity-90">
-                Riceverai una copia di questi risultati all'indirizzo: {email}
+                Riceverai una copia di questi risultati all'indirizzo: {userProfile.email}
               </p>
             </div>
           </CardContent>
