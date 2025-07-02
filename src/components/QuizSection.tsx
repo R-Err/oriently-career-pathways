@@ -163,30 +163,9 @@ const QuizSection = ({ onQuizComplete }: QuizSectionProps) => {
     try {
       logOperation('QUIZ_START', userProfile.email, 'Processing quiz submission');
 
-      // Generate AI profile using real ChatGPT API
+      // Generate AI profile using real ChatGPT API or fallback
       const aiResult = await generateAIProfile(answers, userProfile.firstName, userProfile.email);
       
-      // Check if AI profile generation failed completely
-      if (!aiResult.profile || aiResult.profile.includes("Si è verificato un problema nella generazione del profilo")) {
-        // AI failed - show only error message, no courses
-        const profile: ProfileResult = {
-          id: "ai-failed", 
-          title: "Profilo non disponibile",
-          description: "Non siamo riusciti a generare il tuo profilo personalizzato al momento. Ti preghiamo di riprovare più tardi.",
-          courses: [], // No courses when AI fails
-          color: "from-gray-500 to-gray-600"
-        };
-
-        onQuizComplete(profile, userProfile);
-        
-        toast({
-          title: "Profilo non generato",
-          description: "Non siamo riusciti a creare il tuo profilo. Riprova più tardi.",
-          variant: "destructive",
-        });
-        return;
-      }
-
       // Create profile result with AI data
       const profile: ProfileResult = {
         id: "ai-generated", 
