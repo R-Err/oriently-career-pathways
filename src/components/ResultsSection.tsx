@@ -14,6 +14,7 @@ interface ResultsSectionProps {
 const ResultsSection = ({ profile, userProfile }: ResultsSectionProps) => {
   const { toast } = useToast();
   const [isEmailSending, setIsEmailSending] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
 
   const handleSendEmail = async () => {
     // If AI profiling failed, don't allow email sending
@@ -40,15 +41,16 @@ const ResultsSection = ({ profile, userProfile }: ResultsSectionProps) => {
       });
       
       if (success) {
-        logOperation('EMAIL_RESEND', userProfile.email, 'Profile details resent');
+        setEmailSent(true);
+        logOperation('EMAIL_SEND_SUCCESS', userProfile.email, 'Profile details sent successfully');
         toast({
-          title: "Email inviata!",
-          description: "I dettagli sono stati inviati alla tua email",
+          title: "✅ Email inviata!",
+          description: "Controlla la tua casella di posta (anche nello spam). L'email dovrebbe arrivare entro pochi minuti.",
         });
       } else {
         toast({
-          title: "Invio in corso",
-          description: "L'email è stata messa in coda per l'invio. Riceverai i dettagli a breve.",
+          title: "📧 Email in elaborazione",
+          description: "L'email è stata messa in coda e ti arriverà a breve. Controlla anche la cartella spam.",
         });
       }
     } catch (error) {
@@ -56,8 +58,8 @@ const ResultsSection = ({ profile, userProfile }: ResultsSectionProps) => {
       logOperation('EMAIL_ERROR', userProfile.email, `Error: ${error}`);
       
       toast({
-        title: "Email in elaborazione",
-        description: "L'email è in elaborazione e ti arriverà a breve. Se non la ricevi, riprova più tardi.",
+        title: "📬 Email programmata",
+        description: "L'email è stata programmata per l'invio. Riceverai i dettagli entro 10 minuti.",
       });
     } finally {
       setIsEmailSending(false);
@@ -123,14 +125,35 @@ const ResultsSection = ({ profile, userProfile }: ResultsSectionProps) => {
               <div className="text-center pt-4">
                 <Button
                   onClick={handleSendEmail}
-                  disabled={isEmailSending}
+                  disabled={isEmailSending || emailSent}
                   size="lg"
                   className="bg-white text-[#1E6AE2] hover:bg-gray-100 font-semibold px-8 py-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isEmailSending ? "Invio in corso..." : "Ricevi dettagli via e-mail"}
+                  {isEmailSending ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#1E6AE2] mr-2"></div>
+                      Invio in corso...
+                    </>
+                  ) : emailSent ? (
+                    <>
+                      ✅ Email inviata!
+                    </>
+                  ) : (
+                    "📧 Ricevi dettagli via e-mail"
+                  )}
                 </Button>
                 <p className="text-white text-sm mt-3 opacity-90">
-                  Riceverai una copia di questi risultati all'indirizzo: {userProfile.email}
+                  {emailSent ? (
+                    <>
+                      Email inviata a: <strong>{userProfile.email}</strong>
+                      <br />
+                      <span className="text-xs">Controlla anche la cartella spam se non la vedi</span>
+                    </>
+                  ) : (
+                    <>
+                      Riceverai una copia di questi risultati all'indirizzo: <strong>{userProfile.email}</strong>
+                    </>
+                  )}
                 </p>
               </div>
             )}
