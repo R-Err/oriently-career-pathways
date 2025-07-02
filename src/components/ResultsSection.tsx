@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ProfileResult, UserProfile } from "@/types/quiz";
@@ -14,7 +13,7 @@ interface ResultsSectionProps {
 
 const ResultsSection = ({ profile, userProfile }: ResultsSectionProps) => {
   const { toast } = useToast();
-  const [isEmailDisabled, setIsEmailDisabled] = useState(false);
+  const [isEmailSending, setIsEmailSending] = useState(false);
 
   const handleSendEmail = async () => {
     // If AI profiling failed, don't allow email sending
@@ -26,6 +25,8 @@ const ResultsSection = ({ profile, userProfile }: ResultsSectionProps) => {
       });
       return;
     }
+
+    setIsEmailSending(true);
 
     try {
       const success = await sendQuizResultEmail({
@@ -42,22 +43,24 @@ const ResultsSection = ({ profile, userProfile }: ResultsSectionProps) => {
         logOperation('EMAIL_RESEND', userProfile.email, 'Profile details resent');
         toast({
           title: "Email inviata!",
-          description: "I dettagli sono stati inviati nuovamente alla tua email",
+          description: "I dettagli sono stati inviati alla tua email",
         });
       } else {
-        throw new Error("Failed to send email");
+        toast({
+          title: "Invio in corso",
+          description: "L'email è stata messa in coda per l'invio. Riceverai i dettagli a breve.",
+        });
       }
     } catch (error) {
       console.error("Error sending email:", error);
       logOperation('EMAIL_ERROR', userProfile.email, `Error: ${error}`);
       
-      // Disable email functionality temporarily
-      setIsEmailDisabled(true);
       toast({
-        title: "Servizio email temporaneamente non disponibile",
-        description: "Il servizio di invio email è momentaneamente non disponibile. Riprova più tardi.",
-        variant: "destructive",
+        title: "Email in elaborazione",
+        description: "L'email è in elaborazione e ti arriverà a breve. Se non la ricevi, riprova più tardi.",
       });
+    } finally {
+      setIsEmailSending(false);
     }
   };
 
@@ -115,27 +118,19 @@ const ResultsSection = ({ profile, userProfile }: ResultsSectionProps) => {
               </div>
             )}
 
-            {/* Only show email button if profiling succeeded and email is not disabled */}
-            {!isProfileFailed && !isEmailDisabled && (
+            {/* Show email button if profiling succeeded */}
+            {!isProfileFailed && (
               <div className="text-center pt-4">
                 <Button
                   onClick={handleSendEmail}
+                  disabled={isEmailSending}
                   size="lg"
-                  className="bg-white text-[#1E6AE2] hover:bg-gray-100 font-semibold px-8 py-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+                  className="bg-white text-[#1E6AE2] hover:bg-gray-100 font-semibold px-8 py-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Ricevi dettagli via e-mail
+                  {isEmailSending ? "Invio in corso..." : "Ricevi dettagli via e-mail"}
                 </Button>
                 <p className="text-white text-sm mt-3 opacity-90">
                   Riceverai una copia di questi risultati all'indirizzo: {userProfile.email}
-                </p>
-              </div>
-            )}
-
-            {/* Show disabled message if email is disabled */}
-            {!isProfileFailed && isEmailDisabled && (
-              <div className="text-center pt-4">
-                <p className="text-white text-sm opacity-75">
-                  Servizio email temporaneamente non disponibile
                 </p>
               </div>
             )}

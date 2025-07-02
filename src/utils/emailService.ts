@@ -1,4 +1,3 @@
-
 import { logOperation } from "./logger";
 
 export interface EmailData {
@@ -30,13 +29,14 @@ export const sendQuizResultEmail = async (emailData: EmailData): Promise<boolean
 
     const result = await response.json();
     
-    if (result.error) {
-      logOperation('EMAIL_SEND_ERROR', emailData.email, `Error: ${result.error}`);
+    // Check if the response indicates success
+    if (result.success) {
+      logOperation('EMAIL_SEND_SUCCESS', emailData.email, `Email sent successfully: ${result.result?.status || 'sent'}`);
+      return true;
+    } else {
+      logOperation('EMAIL_SEND_ERROR', emailData.email, `Error: ${result.error || 'Unknown error'}`);
       return false;
     }
-
-    logOperation('EMAIL_SEND_SUCCESS', emailData.email, 'Email sent successfully');
-    return true;
   } catch (error) {
     logOperation('EMAIL_SEND_ERROR', emailData.email, `Error: ${error}`);
     return false;
