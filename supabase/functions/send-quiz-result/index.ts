@@ -26,36 +26,14 @@ const handler = async (req: Request): Promise<Response> => {
     
     console.log("Sending email to:", email);
 
-    // Get available courses data
-    const availableCourses = [
-      { title: "Corso Full Stack Developer", provider: "Start2Impact", link: "https://www.start2impact.it/corsi/full-stack-developer" },
-      { title: "Corso UX/UI Design", provider: "Start2Impact", link: "https://www.start2impact.it/corsi/ux-ui-design" },
-      { title: "Corso Data Analyst", provider: "Boolean", link: "https://www.boolean.careers/corso-data-analyst" },
-      { title: "Corso Web Developer", provider: "Boolean", link: "https://www.boolean.careers/corso-web-developer" },
-      { title: "Corso Digital Marketing", provider: "Talent Garden", link: "https://talentgarden.org/it/corsi/digital-marketing/" },
-      { title: "Corso Cybersecurity", provider: "Talent Garden", link: "https://talentgarden.org/it/corsi/cybersecurity/" },
-      { title: "Corso Product Management", provider: "Start2Impact", link: "https://www.start2impact.it/corsi/product-management" },
-      { title: "Corso Graphic Design", provider: "IED", link: "https://www.ied.it/corsi/grafica" },
-      { title: "Corso Intelligenza Artificiale", provider: "Talent Garden", link: "https://talentgarden.org/it/corsi/intelligenza-artificiale/" },
-      { title: "Corso Project Management", provider: "Uninettuno", link: "https://www.uninettunouniversity.net/it/corso.aspx?id=370" }
-    ];
-
-    // Create course links HTML
-    const courseLinksHtml = suggestedCourses.map(courseName => {
-      const courseDetails = availableCourses.find(c => c.title === courseName);
-      if (courseDetails) {
-        return `
-          <div style="margin: 15px 0; padding: 15px; background-color: #f8f9fa; border-radius: 8px; border-left: 4px solid #1E6AE2;">
-            <h4 style="margin: 0 0 8px 0; color: #1E6AE2; font-size: 16px;">${courseDetails.title}</h4>
-            <p style="margin: 0 0 8px 0; color: #666; font-size: 14px;">Provider: ${courseDetails.provider}</p>
-            <a href="${courseDetails.link}" style="color: #1E6AE2; text-decoration: none; font-weight: 500;">Scopri di più →</a>
-          </div>
-        `;
-      }
-      return `<li style="margin: 8px 0;">${courseName}</li>`;
-    }).join('');
-
     const locationText = province && region ? `${city}, ${province} - ${region}` : city;
+
+    // Create course list HTML without links
+    const courseListHtml = suggestedCourses.map((courseName, index) => `
+      <div style="margin: 15px 0; padding: 15px; background-color: #f8f9fa; border-radius: 8px; border-left: 4px solid #1E6AE2;">
+        <h4 style="margin: 0 0 8px 0; color: #1E6AE2; font-size: 16px;">${index + 1}. ${courseName}</h4>
+      </div>
+    `).join('');
 
     const htmlContent = `
       <!DOCTYPE html>
@@ -80,7 +58,7 @@ const handler = async (req: Request): Promise<Response> => {
 
           <div style="background-color: #fff; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 25px;">
             <h3 style="color: #1E6AE2; margin-top: 0;">Percorsi consigliati per te:</h3>
-            ${courseLinksHtml}
+            ${courseListHtml}
           </div>
 
           <div style="text-align: center; padding: 20px; background-color: #f8f9fa; border-radius: 10px;">
@@ -99,10 +77,11 @@ const handler = async (req: Request): Promise<Response> => {
       headers: {
         "Authorization": `Bearer ${Deno.env.get("MAILERLITE_API_KEY")}`,
         "Content-Type": "application/json",
+        "Accept": "application/json",
       },
       body: JSON.stringify({
         to: [{ email: email, name: firstName }],
-        from: { email: "noreply@yourdomain.com", name: "Oriently" },
+        from: { email: "noreply@oriently.it", name: "Oriently Quiz" },
         subject: `${firstName}, ecco il tuo profilo professionale! 🎯`,
         html: htmlContent,
       }),

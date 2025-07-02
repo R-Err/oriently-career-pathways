@@ -10,8 +10,9 @@ import { ProfileResult, QuizAnswer, UserProfile } from "@/types/quiz";
 import { generateAIProfile } from "@/utils/aiProfileGenerator";
 import { sendQuizResultEmail } from "@/utils/emailService";
 import { saveQuizSubmission } from "@/utils/simpleStorage";
-import { findCityInfo } from "@/data/cities";
+import { CityMapping } from "@/data/cities";
 import { logOperation } from "@/utils/logger";
+import CityAutocomplete from "./CityAutocomplete";
 
 interface QuizSectionProps {
   onQuizComplete: (profile: ProfileResult, userProfile: UserProfile) => void;
@@ -26,6 +27,8 @@ const QuizSection = ({ onQuizComplete }: QuizSectionProps) => {
     city: "",
     country: "Italy"
   });
+  const [cityError, setCityError] = useState("");
+  const [validCityInfo, setValidCityInfo] = useState<CityMapping | null>(null);
   const [gdprConsent, setGdprConsent] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
@@ -105,7 +108,7 @@ const QuizSection = ({ onQuizComplete }: QuizSectionProps) => {
     if (currentStep < questions.length - 1) {
       setCurrentStep(currentStep + 1);
     } else {
-      setCurrentStep(currentStep + 1); // Move to profile form
+      setCurrentStep(currentStep + 1);
     }
   };
 
@@ -114,25 +117,42 @@ const QuizSection = ({ onQuizComplete }: QuizSectionProps) => {
       ...prev,
       [field]: value
     }));
+  };
 
-    // Auto-fill province and region when city is entered
-    if (field === 'city' && value) {
-      const cityInfo = findCityInfo(value);
-      if (cityInfo) {
-        setUserProfile(prev => ({
-          ...prev,
-          province: cityInfo.province,
-          region: cityInfo.region
-        }));
-      }
+  const handleCityChange = (city: string, cityInfo: CityMapping | null) => {
+    setUserProfile(prev => ({
+      ...prev,
+      city,
+      province: cityInfo?.province || "",
+      region: cityInfo?.region || ""
+    }));
+    
+    setValidCityInfo(cityInfo);
+    
+    if (city && !cityInfo) {
+      setCityError("Seleziona una città dalla lista");
+    } else {
+      setCityError("");
     }
   };
 
   const handleSubmit = async () => {
+    // Validate required fields
     if (!userProfile.firstName || !userProfile.email || !userProfile.city || !gdprConsent) {
       toast({
         title: "Errore",
         description: "Compila tutti i campi obbligatori e accetta il consenso GDPR",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate city is from the approved list
+    if (!validCityInfo) {
+      setCityError("Seleziona una città dalla lista");
+      toast({
+        title: "Errore",
+        description: "Seleziona una città valida dalla lista",
         variant: "destructive",
       });
       return;
@@ -146,7 +166,28 @@ const QuizSection = ({ onQuizComplete }: QuizSectionProps) => {
       // Generate AI profile using real ChatGPT API
       const aiResult = await generateAIProfile(answers, userProfile.firstName, userProfile.email);
       
-      // Create profile result
+      // Check if AI profile generation failed completely
+      if (!aiResult.profile || aiResult.profile.includes("Si è verificato un problema nella generazione del profilo")) {
+        // AI failed - show only error message, no courses
+        const profile: ProfileResult = {
+          id: "ai-failed", 
+          title: "Profilo non disponibile",
+          description: "Non siamo riusciti a generare il tuo profilo personalizzato al momento. Ti preghiamo di riprovare più tardi.",
+          courses: [], // No courses when AI fails
+          color: "from-gray-500 to-gray-600"
+        };
+
+        onQuizComplete(profile, userProfile);
+        
+        toast({
+          title: "Profilo non generato",
+          description: "Non siamo riusciti a creare il tuo profilo. Riprova più tardi.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Create profile result with AI data
       const profile: ProfileResult = {
         id: "ai-generated", 
         title: "Il tuo profilo personalizzato",
@@ -169,19 +210,25 @@ const QuizSection = ({ onQuizComplete }: QuizSectionProps) => {
         suggestedCourses: aiResult.suggestedCourses
       });
 
-      // Send email with real MailerLite API
-      const emailSent = await sendQuizResultEmail({
-        firstName: userProfile.firstName,
-        email: userProfile.email,
-        profile: aiResult.profile,
-        suggestedCourses: aiResult.suggestedCourses,
-        city: userProfile.city,
-        province: userProfile.province,
-        region: userProfile.region
-      });
+      // Try to send email (but don't block if it fails)
+      try {
+        const emailSent = await sendQuizResultEmail({
+          firstName: userProfile.firstName,
+          email: userProfile.email,
+          profile: aiResult.profile,
+          suggestedCourses: aiResult.suggestedCourses,
+          city: userProfile.city,
+          province: userProfile.province,
+          region: userProfile.region
+        });
 
-      if (emailSent) {
-        logOperation('EMAIL_SEND', userProfile.email, 'Email sent successfully');
+        if (emailSent) {
+          logOperation('EMAIL_SEND', userProfile.email, 'Email sent successfully');
+        }
+      } catch (emailError) {
+        // Log email error but don't fail the entire process
+        logOperation('EMAIL_ERROR', userProfile.email, `Email failed: ${emailError}`);
+        console.warn('Email sending failed, but quiz completion continues');
       }
 
       // Show results
@@ -189,7 +236,7 @@ const QuizSection = ({ onQuizComplete }: QuizSectionProps) => {
 
       toast({
         title: "Quiz completato!",
-        description: emailSent ? "Il tuo profilo è pronto e ti abbiamo inviato una copia via email" : "Il tuo profilo è pronto",
+        description: "Il tuo profilo è pronto",
       });
     } catch (error) {
       console.error("Error submitting quiz:", error);
@@ -207,7 +254,7 @@ const QuizSection = ({ onQuizComplete }: QuizSectionProps) => {
   const currentAnswer = answers.find(a => a.questionId === questions[currentStep]?.id);
   const isProfileForm = currentStep >= questions.length;
   const canProceed = isProfileForm ? 
-    (userProfile.firstName && userProfile.email && userProfile.city && gdprConsent) : 
+    (userProfile.firstName && userProfile.email && validCityInfo && gdprConsent) : 
     currentAnswer;
 
   return (
@@ -253,12 +300,16 @@ const QuizSection = ({ onQuizComplete }: QuizSectionProps) => {
                   className="space-y-3"
                 >
                   {questions[currentStep].options.map((option) => (
-                    <div key={option.value} className="flex items-center space-x-3 p-4 rounded-lg hover:bg-gray-50 cursor-pointer border border-gray-200 hover:border-[#1E6AE2] transition-colors">
+                    <label 
+                      key={option.value} 
+                      htmlFor={option.value}
+                      className="flex items-center space-x-3 p-4 rounded-lg hover:bg-gray-50 cursor-pointer border border-gray-200 hover:border-[#1E6AE2] transition-colors"
+                    >
                       <RadioGroupItem value={option.value} id={option.value} />
-                      <Label htmlFor={option.value} className="cursor-pointer flex-1 text-base">
+                      <span className="flex-1 text-base">
                         {option.label}
-                      </Label>
-                    </div>
+                      </span>
+                    </label>
                   ))}
                 </RadioGroup>
               </>
@@ -293,22 +344,17 @@ const QuizSection = ({ onQuizComplete }: QuizSectionProps) => {
                     />
                   </div>
 
-                  <div>
-                    <Label htmlFor="city">In quale città vivi? *</Label>
-                    <Input
-                      id="city"
-                      type="text"
-                      value={userProfile.city}
-                      onChange={(e) => handleUserProfileChange('city', e.target.value)}
-                      placeholder="Milano, Roma, Napoli..."
-                      className="mt-1"
-                    />
-                    {userProfile.province && (
-                      <p className="text-sm text-gray-600 mt-1">
-                        📍 {userProfile.city}, {userProfile.province} - {userProfile.region}
-                      </p>
-                    )}
-                  </div>
+                  <CityAutocomplete
+                    value={userProfile.city}
+                    onChange={handleCityChange}
+                    error={cityError}
+                  />
+                  
+                  {validCityInfo && (
+                    <p className="text-sm text-gray-600">
+                      📍 {validCityInfo.city}, {validCityInfo.province} - {validCityInfo.region}
+                    </p>
+                  )}
 
                   <div className="flex items-start space-x-3">
                     <Checkbox
