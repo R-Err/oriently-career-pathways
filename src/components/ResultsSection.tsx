@@ -1,9 +1,9 @@
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ProfileResult, UserProfile } from "@/types/quiz";
 import { useToast } from "@/hooks/use-toast";
 import { logOperation } from "@/utils/logger";
+import { sendQuizResultEmail } from "@/utils/emailService";
 import { AVAILABLE_COURSES } from "@/data/courses";
 
 interface ResultsSectionProps {
@@ -16,15 +16,25 @@ const ResultsSection = ({ profile, userProfile }: ResultsSectionProps) => {
 
   const handleSendEmail = async () => {
     try {
-      // Simulate email sending
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      logOperation('EMAIL_RESEND', userProfile.email, 'Profile details resent');
-      
-      toast({
-        title: "Email inviata!",
-        description: "I dettagli sono stati inviati nuovamente alla tua email",
+      const success = await sendQuizResultEmail({
+        firstName: userProfile.firstName,
+        email: userProfile.email,
+        profile: profile.description,
+        suggestedCourses: profile.courses,
+        city: userProfile.city,
+        province: userProfile.province,
+        region: userProfile.region
       });
+      
+      if (success) {
+        logOperation('EMAIL_RESEND', userProfile.email, 'Profile details resent');
+        toast({
+          title: "Email inviata!",
+          description: "I dettagli sono stati inviati nuovamente alla tua email",
+        });
+      } else {
+        throw new Error("Failed to send email");
+      }
     } catch (error) {
       console.error("Error sending email:", error);
       logOperation('EMAIL_ERROR', userProfile.email, `Error: ${error}`);

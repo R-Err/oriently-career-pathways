@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,12 +7,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { ProfileResult, QuizAnswer, UserProfile } from "@/types/quiz";
-import { calculateProfile } from "@/utils/profileCalculator";
 import { generateAIProfile } from "@/utils/aiProfileGenerator";
+import { sendQuizResultEmail } from "@/utils/emailService";
 import { saveQuizSubmission } from "@/utils/simpleStorage";
 import { findCityInfo } from "@/data/cities";
 import { logOperation } from "@/utils/logger";
-import { AVAILABLE_COURSES } from "@/data/courses";
 
 interface QuizSectionProps {
   onQuizComplete: (profile: ProfileResult, userProfile: UserProfile) => void;
@@ -145,12 +143,12 @@ const QuizSection = ({ onQuizComplete }: QuizSectionProps) => {
     try {
       logOperation('QUIZ_START', userProfile.email, 'Processing quiz submission');
 
-      // Generate AI profile
+      // Generate AI profile using real ChatGPT API
       const aiResult = await generateAIProfile(answers, userProfile.firstName, userProfile.email);
       
       // Create profile result
       const profile: ProfileResult = {
-        id: "ai-generated",
+        id: "ai-generated", 
         title: "Il tuo profilo personalizzato",
         description: aiResult.profile,
         courses: aiResult.suggestedCourses,
@@ -171,15 +169,27 @@ const QuizSection = ({ onQuizComplete }: QuizSectionProps) => {
         suggestedCourses: aiResult.suggestedCourses
       });
 
-      // Simulate email sending
-      logOperation('EMAIL_SEND', userProfile.email, 'Email sent successfully');
+      // Send email with real MailerLite API
+      const emailSent = await sendQuizResultEmail({
+        firstName: userProfile.firstName,
+        email: userProfile.email,
+        profile: aiResult.profile,
+        suggestedCourses: aiResult.suggestedCourses,
+        city: userProfile.city,
+        province: userProfile.province,
+        region: userProfile.region
+      });
+
+      if (emailSent) {
+        logOperation('EMAIL_SEND', userProfile.email, 'Email sent successfully');
+      }
 
       // Show results
       onQuizComplete(profile, userProfile);
 
       toast({
         title: "Quiz completato!",
-        description: "Il tuo profilo personalizzato è pronto",
+        description: emailSent ? "Il tuo profilo è pronto e ti abbiamo inviato una copia via email" : "Il tuo profilo è pronto",
       });
     } catch (error) {
       console.error("Error submitting quiz:", error);
